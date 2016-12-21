@@ -251,7 +251,7 @@ def plot(groups, figures, configurations, all_records):
 
             for plot in group_figure_plots:
 
-                source = bokeh.models.ColumnDataSource(ColumnDataSource.from_df(plot['columns']))
+                source = bokeh.models.ColumnDataSource(bokeh.models.ColumnDataSource.from_df(plot['columns']))
 
                 group_figure.circle(
                         figure['x_axis'],
