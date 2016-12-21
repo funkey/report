@@ -10,19 +10,19 @@ python setup.py install
 # Example usage:
 
 The following example will create a grid of plots. The rows are called
-/groups/. Each group contains several /figures/. Each figure contains a plot
-according to the given /configurations/.
+`groups`. Each group contains several `figures`. Each figure contains a plot
+according to the given `configurations`.
 
-/groups/ and /configurations/ are lists of dictionaries. Each dictionary
+`groups` and `configurations` are lists of dictionaries. Each dictionary
 describes a filter on the data. Only rows in the `pandas` data frame that match
 all filters are shown. If the value of a filter entry is a list, any value in
 the list matches.
 
-/figures/ is a dictionary with the mandatory keys `x_axis` and `y_axis`. The
+`figures` is a dictionary with the mandatory keys `x_axis` and `y_axis`. The
 values should have the names of columns with numerical data in the `pandas`
 data frame. A figure can have an optional `title`.
 
-/configurations/ can have optional keys `label` and `color` (which are not used
+`configurations` can have optional keys `label` and `color` (which are not used
 for matching).
 
 ```python
