@@ -81,14 +81,29 @@ def read_all_results(data_backend = 'json_files', **kwargs):
     else:
         raise RuntimeError("no such data backend '" + str(data_backend) + "'")
 
-    vs = data_frame['voi_split']
-    vm = data_frame['voi_merge']
-    rs = data_frame['rand_split']
-    rm = data_frame['rand_merge']
+    try:
+        ts = data_frame['ted_split']
+        tm = data_frame['ted_merge']
+        tp = data_frame['ted_fp']
+        tn = data_frame['ted_fn']
+        data_frame['ted_sum'] = np.array(ts+tm+tp+tn, dtype=np.float32)
+    except:
+        pass
 
-    data_frame['voi_sum'] = np.array(vs + vm, dtype=np.float32)
-    data_frame['arand'] = np.array(1.0 - (2.0*rs*rm)/(rs+rm), dtype=np.float32)
-    data_frame['cremi_score'] = np.sqrt(np.array(data_frame['voi_sum']*data_frame['arand'], dtype=np.float32))
+    try:
+        vs = data_frame['voi_split']
+        vm = data_frame['voi_merge']
+        data_frame['voi_sum'] = np.array(vs + vm, dtype=np.float32)
+    except:
+        pass
+
+    try:
+        rs = data_frame['rand_split']
+        rm = data_frame['rand_merge']
+        data_frame['arand'] = np.array(1.0 - (2.0*rs*rm)/(rs+rm), dtype=np.float32)
+        data_frame['cremi_score'] = np.sqrt(np.array(data_frame['voi_sum']*data_frame['arand'], dtype=np.float32))
+    except:
+        pass
 
     return data_frame
 
