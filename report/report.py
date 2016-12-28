@@ -9,16 +9,15 @@ import bokeh.layouts
 import bokeh.models
 import bokeh.palettes
 
-processed_dir = 'processed'
 verbose = False
 
-def fetch_data_frame_from_json():
+def fetch_data_frame_from_json(data_dir='processed'):
 
     start = time.time()
 
     print("Collecting record files...")
     record_files = []
-    for root, _, filenames in os.walk(processed_dir):
+    for root, _, filenames in os.walk(data_dir):
         for filename in fnmatch.filter(filenames, '*.json'):
                 record_files.append(os.path.join(root, filename))
     if verbose:
@@ -49,7 +48,7 @@ def fetch_data_frame_from_json():
 
     return data_frame
 
-def read_all_results(data_backend = 'json_files'):
+def read_all_results(data_backend = 'json_files', **kwargs):
     '''Reads all results provided by the given data backend, and returns them
     as a panda data frame with at least the following columns:
 
@@ -78,7 +77,7 @@ def read_all_results(data_backend = 'json_files'):
     '''
 
     if data_backend == 'json_files':
-        data_frame = fetch_data_frame_from_json()
+        data_frame = fetch_data_frame_from_json(**kwargs)
     else:
         raise RuntimeError("no such data backend '" + str(data_backend) + "'")
 
