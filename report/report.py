@@ -217,8 +217,14 @@ def plot(groups, figures, configurations, all_records):
 
     for configuration in configurations:
 
+        if verbose:
+            print("processing configuration " + str(configuration))
+
         # attach to the plots
         for group in groups:
+
+            if verbose:
+                print("processing group " + str(group))
 
             filtered_records = filter(all_records, [configuration, group])
 
