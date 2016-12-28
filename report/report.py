@@ -180,6 +180,9 @@ def filter(records, configurations):
             else:
                 match_mask &= value_mask
 
+    if len(values_queries) == 0:
+        return records
+
     query_string = " and ".join(values_queries)
 
     if verbose:
