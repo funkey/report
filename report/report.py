@@ -215,6 +215,7 @@ def plot(groups, figures, configurations, all_records):
 
     plots = { get_title(group): [] for group in groups }
 
+    configuration_num = 0
     for configuration in configurations:
 
         if verbose:
@@ -237,10 +238,12 @@ def plot(groups, figures, configurations, all_records):
 
                 'columns': filtered_records,
                 'label': get_configuration_label(configuration),
-                'color': bokeh.palettes.Spectral6[hash(str(configuration))%len(bokeh.palettes.Spectral6)] if 'color' not in configuration else configuration['color']
+                'color': bokeh.palettes.Spectral6[configuration_num%len(bokeh.palettes.Spectral6)] if 'color' not in configuration else configuration['color']
             }
 
             plots[get_title(group)].append(plot)
+
+        configuration_num += 1
 
     print("Prepared data in " + str(time.time() - start) + "s")
 
