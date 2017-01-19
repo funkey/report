@@ -170,10 +170,10 @@ def filter(records, configurations):
 
             # first possible value
             value_mask = (records[k] == possible_values[0])
-            for i in range(2, len(possible_values)):
+            for i in range(1, len(possible_values)):
                 value_mask |= (records[k] == possible_values[i])
 
-            values_queries.append(" or ".join([str(k) + " == " + str(v) for v in possible_values]))
+            values_queries.append("(" + " or ".join([str(k) + " == " + str(v) for v in possible_values]) + ")")
 
             if match_mask is None:
                 match_mask = value_mask
