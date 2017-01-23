@@ -168,10 +168,17 @@ def filter(records, configurations):
 
             possible_values = c[k] if isinstance(c[k], list) else [c[k]]
 
-            # first possible value
-            value_mask = (records[k] == possible_values[0])
-            for i in range(1, len(possible_values)):
-                value_mask |= (records[k] == possible_values[i])
+            value_mask = None
+
+            for value in possible_values:
+                if value is None:
+                    expression = (pandas.isnull(records[k]))
+                else:
+                    expression = (records[k] == value)
+                if value_mask is None:
+                    value_mask = expression
+                else:
+                    value_mask |= expression
 
             values_queries.append("(" + " or ".join([str(k) + " == " + str(v) for v in possible_values]) + ")")
 
