@@ -198,6 +198,30 @@ def filter(records, configurations):
     filtered = records[match_mask]
     return filtered
 
+def smooth(keys, values, factor):
+
+    assert(len(keys) == len(values))
+    if len(keys) == 0:
+        return keys, values
+
+    # co-sort keys and values by keys
+    keys, values = map(np.array, zip(*sorted(zip(keys, values))))
+
+    values_mean = np.mean(
+            np.array(
+                values[:int(np.floor(len(values)/factor))*factor]
+            ).reshape(-1,factor),
+            axis=1
+    )
+    keys_mean = np.mean(
+            np.array(
+                keys[:int(np.floor(len(keys)/factor))*factor]
+            ).reshape(-1,factor),
+            axis=1
+    )
+
+    return keys_mean, values_mean
+
 def plot(groups, figures, configurations, all_records):
 
     # configurations are dictionaries with keys like
@@ -284,7 +308,11 @@ def plot(groups, figures, configurations, all_records):
 
             for plot in group_figure_plots:
 
-                source = bokeh.models.ColumnDataSource(bokeh.models.ColumnDataSource.from_df(plot['columns']))
+                if 'smooth' in figure and figure['smooth'] > 0:
+                    x, y = smooth(plot['columns'][figure['x_axis']], plot['columns'][figure['y_axis']], figure['smooth'])
+                    source = bokeh.models.ColumnDataSource({figure['x_axis']: x, figure['y_axis']: y})
+                else:
+                    source = bokeh.models.ColumnDataSource(bokeh.models.ColumnDataSource.from_df(plot['columns']))
 
                 group_figure.circle(
                         figure['x_axis'],
