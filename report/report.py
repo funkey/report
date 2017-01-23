@@ -352,6 +352,10 @@ def plot(groups, figures, configurations, all_records):
 
     print("Plotted in " + str(time.time() - start) + "s")
 
+def render_table(data):
+    from IPython.core.display import HTML, display
+    display(HTML(data.to_html()))
+
 if __name__ == '__main__':
 
     verbose = True
