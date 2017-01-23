@@ -292,6 +292,13 @@ def plot(groups, figures, configurations, all_records):
 
             keys = list(filtered_records.keys())
             keys.sort()
+
+            # bokeh does not handle nan in python notebooks correctly, we 
+            # replace them with a string here
+            for key in keys:
+                filtered_records[filtered_records['key'].null()] = 'nan'
+
+            # configure the tool-tip to show all keys
             tooltips="".join([
                 "<div><span>%s: @%s</span></div>"%(key,key) for key in keys
             ])
