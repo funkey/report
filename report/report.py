@@ -11,6 +11,8 @@ import bokeh.palettes
 
 verbose = False
 
+confugruation_keywords = ['color', 'label', 'style']
+
 def fetch_data_frame_from_json(data_dir='processed'):
 
     start = time.time()
@@ -116,7 +118,7 @@ def matches(record, configuration):
     for key in configuration.keys():
 
         # skip non-record fields
-        if key in ['label', 'color']:
+        if key in confugruation_keywords:
             continue
 
         if key not in record:
@@ -140,7 +142,7 @@ def get_configuration_label(configuration):
     prefix = ""
     for key in configuration.keys():
 
-        if key == 'color':
+        if key in confugruation_keywords:
             continue
 
         if not isinstance(configuration[key], list):
@@ -163,7 +165,7 @@ def filter(records, configurations):
     for c in configurations:
         for k in c:
 
-            if k in ['color', 'label']:
+            if k in confugruation_keywords:
                 continue
 
             possible_values = c[k] if isinstance(c[k], list) else [c[k]]
@@ -269,7 +271,8 @@ def plot(groups, figures, configurations, all_records):
 
                 'columns': filtered_records,
                 'label': get_configuration_label(configuration),
-                'color': bokeh.palettes.Spectral6[configuration_num%len(bokeh.palettes.Spectral6)] if 'color' not in configuration else configuration['color']
+                'color': bokeh.palettes.Spectral6[configuration_num%len(bokeh.palettes.Spectral6)] if 'color' not in configuration else configuration['color'],
+                'style': configuration['style'] if 'style' in configuration else 'circle'
             }
 
             plots[get_title(group)].append(plot)
@@ -314,15 +317,33 @@ def plot(groups, figures, configurations, all_records):
                 else:
                     source = bokeh.models.ColumnDataSource(bokeh.models.ColumnDataSource.from_df(plot['columns']))
 
-                group_figure.circle(
+                plot_function = group_figure.circle
+                plot_args = {}
+
+                if plot['style'] == 'line':
+
+                    plot_function = group_figure.line
+                    plot_args['line_color'] = plot['color']
+                    plot_args['line_width'] = 2
+
+                elif plot['style'] == 'square':
+
+                    plot_function = group_figure.square
+                    plot_args['color'] = plot['color']
+                    plot_args['size'] = 10
+
+                else:
+
+                    plot_function = group_figure.circle
+                    plot_args['color'] = plot['color']
+                    plot_args['size'] = 10
+
+                plot_function(
                         figure['x_axis'],
                         figure['y_axis'],
                         source=source,
                         legend=plot['label'],
-                        line_color=plot['color'],
-                        fill_color=plot['color'],
-                        line_width=2,
-                        size=10)
+                        **plot_args)
 
             group_figures.append(group_figure)
 
