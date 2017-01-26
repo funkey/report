@@ -13,6 +13,11 @@ verbose = False
 
 confugruation_keywords = ['color', 'label', 'style']
 
+# decorator for filter configurations that allow multiple values
+class Any:
+    def __init__(self, values):
+        self.values = values
+
 def fetch_data_frame_from_json(data_dir='processed'):
 
     start = time.time()
@@ -168,7 +173,7 @@ def filter(records, configurations):
             if k in confugruation_keywords:
                 continue
 
-            possible_values = c[k] if isinstance(c[k], list) else [c[k]]
+            possible_values = c[k].values if isinstance(c[k], Any) else [c[k]]
 
             value_mask = None
 
