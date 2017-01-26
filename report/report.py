@@ -300,8 +300,7 @@ def plot(groups, figures, configurations, all_records):
 
             # bokeh does not handle nan in python notebooks correctly, we 
             # replace them with a string here
-            for key in keys:
-                filtered_records[filtered_records['key'].null()] = 'nan'
+            filtered_records = filtered_records.fillna('nan')
 
             # configure the tool-tip to show all keys
             tooltips="".join([
