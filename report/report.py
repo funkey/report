@@ -245,7 +245,7 @@ def filter(records, configurations):
             value_mask = None
 
             for value in possible_values:
-                if value is None:
+                if value is None or value is np.nan:
                     expression = (pandas.isnull(records[k]))
                 else:
                     expression = (records[k] == value)
