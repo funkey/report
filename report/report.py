@@ -11,7 +11,7 @@ import bokeh.palettes
 
 verbose = False
 
-confugruation_keywords = ['color', 'label', 'style']
+configuration_keywords = ['color', 'label', 'style']
 
 colors_rgb = [
 [1, 0, 103],
@@ -190,7 +190,7 @@ def matches(record, configuration):
     for key in configuration.keys():
 
         # skip non-record fields
-        if key in confugruation_keywords:
+        if key in configuration_keywords:
             continue
 
         if key not in record:
@@ -205,23 +205,22 @@ def matches(record, configuration):
 
     return True
 
+def key_value_to_str(d, k):
+    if isinstance(d[k], basestring):
+        return d[k]
+    return str(k)[:2] + ":" + str(d[k])
+
 def get_configuration_label(configuration):
 
     if 'label' in configuration:
         return configuration['label']
 
     label = ""
-    prefix = ""
-    for key in configuration.keys():
 
-        if key in confugruation_keywords:
-            continue
+    keys = sorted(list(configuration.keys()))
+    keys = [ k for k in keys if not k in configuration_keywords ]
 
-        if not isinstance(configuration[key], list):
-            label += prefix + str(configuration[key])
-            prefix = " "
-
-    return label
+    return ", ".join([key_value_to_str(configuration, k) for k in keys])
 
 def get_title(group):
 
@@ -237,7 +236,7 @@ def filter(records, configurations):
     for c in configurations:
         for k in c:
 
-            if k in confugruation_keywords:
+            if k in configuration_keywords:
                 continue
 
             possible_values = c[k].values if isinstance(c[k], Any) else [c[k]]
