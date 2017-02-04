@@ -13,6 +13,73 @@ verbose = False
 
 confugruation_keywords = ['color', 'label', 'style']
 
+colors_rgb = [
+[1, 0, 103],
+[213, 255, 0],
+[255, 0, 86],
+[158, 0, 142],
+[14, 76, 161],
+[255, 229, 2],
+[0, 95, 57],
+[0, 255, 0],
+[149, 0, 58],
+[255, 147, 126],
+[164, 36, 0],
+[0, 21, 68],
+[145, 208, 203],
+[98, 14, 0],
+[107, 104, 130],
+[0, 0, 255],
+[0, 125, 181],
+[106, 130, 108],
+[0, 174, 126],
+[194, 140, 159],
+[190, 153, 112],
+[0, 143, 156],
+[95, 173, 78],
+[255, 0, 0],
+[255, 0, 246],
+[255, 2, 157],
+[104, 61, 59],
+[255, 116, 163],
+[150, 138, 232],
+[152, 255, 82],
+[167, 87, 64],
+[1, 255, 254],
+[255, 238, 232],
+[254, 137, 0],
+[189, 198, 255],
+[1, 208, 255],
+[187, 136, 0],
+[117, 68, 177],
+[165, 255, 210],
+[255, 166, 254],
+[119, 77, 0],
+[122, 71, 130],
+[38, 52, 0],
+[0, 71, 84],
+[67, 0, 44],
+[181, 0, 255],
+[255, 177, 103],
+[255, 219, 102],
+[144, 251, 146],
+[126, 45, 210],
+[189, 211, 147],
+[229, 111, 254],
+[222, 255, 116],
+[0, 255, 120],
+[0, 155, 255],
+[0, 100, 1],
+[0, 118, 255],
+[133, 169, 0],
+[0, 185, 23],
+[120, 130, 49],
+[0, 255, 198],
+[255, 110, 65],
+[232, 94, 190]
+]
+colors = [ '#%02x%02x%02x'%tuple(c) for c in colors_rgb ]
+
 # decorator for filter configurations that allow multiple values
 class Any:
     def __init__(self, values):
@@ -230,6 +297,12 @@ def smooth(keys, values, factor):
     return keys_mean, values_mean
 
 def plot(groups, figures, configurations, all_records):
+    '''Creates figures from the given records.
+
+    Figures are created for each given group.
+
+    Curves are drawn in the figures for each given configuration.
+    '''
 
     # configurations are dictionaries with keys like
     #
@@ -245,25 +318,24 @@ def plot(groups, figures, configurations, all_records):
     # We create a curve for every configuration out of all records that have the 
     # given keys set to the same value(s).
 
-    # data preparation
-    start = time.time()
-
     print("Preparing plot data")
     start = time.time()
 
-    plots = { get_title(group): [] for group in groups }
+    # list of curves per group, identified by title
+    curves = { get_title(group): [] for group in groups }
 
-    configuration_num = 0
-    for configuration in configurations:
+    # prepare panda data frames for each curve in each group
+    for group in groups:
 
         if verbose:
-            print("processing configuration " + str(configuration))
+            print("processing group " + str(group))
 
-        # attach to the plots
-        for group in groups:
+        configuration_num = -1
+        for configuration in configurations:
+            configuration_num += 1
 
             if verbose:
-                print("processing group " + str(group))
+                print("adding configuration " + str(configuration))
 
             filtered_records = filter(all_records, [configuration, group])
 
@@ -271,36 +343,40 @@ def plot(groups, figures, configurations, all_records):
                 print("filtered records for " + str(configuration) + ", group " + str(group) + ":")
                 print(filtered_records)
 
-            # create plot with meta-data
-            plot = {
-
+            # create curve with meta-data
+            curve = {
                 'columns': filtered_records,
                 'label': get_configuration_label(configuration),
-                'color': bokeh.palettes.Spectral6[configuration_num%len(bokeh.palettes.Spectral6)] if 'color' not in configuration else configuration['color'],
+                'color': colors[configuration_num%len(colors)] if 'color' not in configuration else configuration['color'],
                 'style': configuration['style'] if 'style' in configuration else 'circle'
             }
 
-            plots[get_title(group)].append(plot)
-
-        configuration_num += 1
+            curves[get_title(group)].append(curve)
 
     print("Prepared data in " + str(time.time() - start) + "s")
 
     # plotting
     start = time.time()
 
-    average_plot = {}
+    average_curve = {}
+
+    keys = list(all_records.keys())
+    keys.sort()
+
+    # create the figures for each group
     for group in groups:
+
+        if isinstance(group, str) and group == 'average':
+            group_curves = [ v for (_,v) in average_curve.iteritems() ]
+        else:
+            group_curves = curves[get_title(group)]
+
+        if len(group_curves) == 0:
+            print("No record matches group " + get_title(group))
+            continue
 
         group_figures = []
         for figure in figures:
-
-            keys = list(filtered_records.keys())
-            keys.sort()
-
-            # bokeh does not handle nan in python notebooks correctly, we 
-            # replace them with a string here
-            filtered_records = filtered_records.fillna('nan')
 
             # configure the tool-tip to show all keys
             tooltips="".join([
@@ -308,6 +384,8 @@ def plot(groups, figures, configurations, all_records):
             ])
             hover = bokeh.models.HoverTool(tooltips=tooltips)
             tools = ['save','pan','wheel_zoom','box_zoom','reset']
+
+            # create the bokeh figure
             group_figure = bokeh.plotting.figure(
                     title=get_title(group) + " " + get_title(figure),
                     tools=[hover] + tools,
@@ -315,46 +393,47 @@ def plot(groups, figures, configurations, all_records):
                     x_axis_label=figure['x_axis'],
                     y_axis_label=figure['y_axis'])
 
-            if isinstance(group, str) and group == 'average':
-                group_figure_plots = [ v for (_,v) in average_plot.iteritems() ]
-            else:
-                group_figure_plots = plots[get_title(group)]
+            for curve in group_curves:
 
-            for plot in group_figure_plots:
+                columns = curve['columns']
+
+                # bokeh does not handle nan in python notebooks correctly, we 
+                # replace them with a string here
+                columns = columns.fillna('nan')
 
                 if 'smooth' in figure and figure['smooth'] > 0:
-                    x, y = smooth(plot['columns'][figure['x_axis']], plot['columns'][figure['y_axis']], figure['smooth'])
+                    x, y = smooth(columns[figure['x_axis']], columns[figure['y_axis']], figure['smooth'])
                     source = bokeh.models.ColumnDataSource({figure['x_axis']: x, figure['y_axis']: y})
                 else:
-                    source = bokeh.models.ColumnDataSource(bokeh.models.ColumnDataSource.from_df(plot['columns']))
+                    source = bokeh.models.ColumnDataSource(bokeh.models.ColumnDataSource.from_df(columns))
 
-                plot_function = group_figure.circle
-                plot_args = {}
+                draw_function = group_figure.circle
+                draw_args = {}
 
-                if plot['style'] == 'line':
+                if curve['style'] == 'line':
 
-                    plot_function = group_figure.line
-                    plot_args['line_color'] = plot['color']
-                    plot_args['line_width'] = 2
+                    draw_function = group_figure.line
+                    draw_args['line_color'] = curve['color']
+                    draw_args['line_width'] = 2
 
-                elif plot['style'] == 'square':
+                elif curve['style'] == 'square':
 
-                    plot_function = group_figure.square
-                    plot_args['color'] = plot['color']
-                    plot_args['size'] = 10
+                    draw_function = group_figure.square
+                    draw_args['color'] = curve['color']
+                    draw_args['size'] = 10
 
                 else:
 
-                    plot_function = group_figure.circle
-                    plot_args['color'] = plot['color']
-                    plot_args['size'] = 10
+                    draw_function = group_figure.circle
+                    draw_args['color'] = curve['color']
+                    draw_args['size'] = 10
 
-                plot_function(
+                draw_function(
                         figure['x_axis'],
                         figure['y_axis'],
                         source=source,
-                        legend=plot['label'],
-                        **plot_args)
+                        legend=curve['label'],
+                        **draw_args)
 
             group_figures.append(group_figure)
 
