@@ -384,6 +384,8 @@ def plot(groups, figures, configurations, all_records):
             hover = bokeh.models.HoverTool(tooltips=tooltips)
             tools = ['save','pan','wheel_zoom','box_zoom','reset']
 
+            show_legend = len(group_curves) < 5
+
             # create the bokeh figure
             group_figure = bokeh.plotting.figure(
                     title=get_title(group) + " " + get_title(figure),
@@ -427,11 +429,13 @@ def plot(groups, figures, configurations, all_records):
                     draw_args['color'] = curve['color']
                     draw_args['size'] = 10
 
+                if show_legend:
+                    draw_args['legend'] = curve['label']
+
                 draw_function(
                         figure['x_axis'],
                         figure['y_axis'],
                         source=source,
-                        legend=curve['label'],
                         **draw_args)
 
             group_figures.append(group_figure)
