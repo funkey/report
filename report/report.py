@@ -11,7 +11,11 @@ import bokeh.palettes
 
 verbose = False
 
-configuration_keywords = ['color', 'label', 'style', 'title']
+def set_verbose(v):
+    global verbose
+    verbose = v
+
+configuration_keywords = ['color', 'label', 'style', 'title', 'show_legend']
 
 colors_rgb = [
 [1, 0, 103],
@@ -85,7 +89,7 @@ class Any:
     def __init__(self, values):
         self.values = values
 
-def fetch_data_frame_from_json(data_dir='processed'):
+def fetch_data_frame_from_json(row_generator, data_dir='processed'):
 
     start = time.time()
 
@@ -103,7 +107,12 @@ def fetch_data_frame_from_json(data_dir='processed'):
     all_records = []
     for f in record_files:
         try:
-            all_records.append(json.load(open(f, 'r')))
+            record = json.load(open(f, 'r'))
+            if row_generator is not None:
+                record = row_generator(record, f)
+                if record is None:
+                    continue
+            all_records.append(record)
         except:
             print("record file " + f + " seems broken (maybe in process?)")
             pass
@@ -122,7 +131,7 @@ def fetch_data_frame_from_json(data_dir='processed'):
 
     return data_frame
 
-def read_all_results(data_backend = 'json_files', **kwargs):
+def read_all_results(data_backend = 'json_files', row_generator = None, **kwargs):
     '''Reads all results provided by the given data backend, and returns them
     as a panda data frame with at least the following columns:
 
@@ -148,10 +157,17 @@ def read_all_results(data_backend = 'json_files', **kwargs):
             (including subdirectories). Each file is supposed to contain one
             row of the data frame as a dictionary, with column names as
             dictionary keys.
+
+    You can pass an optional 'row_generator', which you can use to overwrite 
+    the way a row is created. The column generator returns a dictionary or None 
+    if the row should be skipped. The keys and values will be added as one row 
+    to the record. For the 'json_files' backend, the arguments passed to the 
+    row_generator are the orginal record (as a dict) and the filename of the 
+    json file.
     '''
 
     if data_backend == 'json_files':
-        data_frame = fetch_data_frame_from_json(**kwargs)
+        data_frame = fetch_data_frame_from_json(row_generator, **kwargs)
     else:
         raise RuntimeError("no such data backend '" + str(data_backend) + "'")
 
@@ -265,6 +281,7 @@ def filter(records, configurations):
 
     query_string = " and ".join(values_queries)
 
+    global verbose
     if verbose:
         print("Filtering with: " + query_string)
 
@@ -303,6 +320,9 @@ def plot(groups, figures, configurations, all_records):
     Curves are drawn in the figures for each given configuration.
     '''
 
+    global verbose
+    print("Verbose set to: " + str(verbose))
+
     # configurations are dictionaries with keys like
     #
     #  sample, setup, iteration, threshold
@@ -329,6 +349,8 @@ def plot(groups, figures, configurations, all_records):
         if verbose:
             print("processing group " + str(group))
 
+        show_legend_group_default = group['show_legend'] if 'show_legend' in group else None
+
         configuration_num = -1
         for configuration in configurations:
             configuration_num += 1
@@ -347,7 +369,8 @@ def plot(groups, figures, configurations, all_records):
                 'columns': filtered_records,
                 'label': get_configuration_label(configuration),
                 'color': colors[configuration_num%len(colors)] if 'color' not in configuration else configuration['color'],
-                'style': configuration['style'] if 'style' in configuration else 'circle'
+                'style': configuration['style'] if 'style' in configuration else 'circle',
+                'show_legend': configuration['show_legend'] if 'show_legend' in configuration else show_legend_group_default
             }
 
             curves[get_title(group)].append(curve)
@@ -384,19 +407,23 @@ def plot(groups, figures, configurations, all_records):
             hover = bokeh.models.HoverTool(tooltips=tooltips)
             tools = ['save','pan','wheel_zoom','box_zoom','reset']
 
-            show_legend = len(group_curves) < 5
-
             # create the bokeh figure
             group_figure = bokeh.plotting.figure(
                     title=get_title(group) + " " + get_title(figure),
                     tools=[hover] + tools,
                     active_scroll='wheel_zoom',
-                    x_axis_label=figure['x_axis'],
-                    y_axis_label=figure['y_axis'])
+                    x_axis_label=figure['x_label'] if 'x_label' in figure else figure['x_axis'],
+                    y_axis_label=figure['y_label'] if 'y_label' in figure else figure['y_axis'],
+                    x_range=figure['x_range'] if 'x_range' in figure else None,
+                    y_range=figure['y_range'] if 'y_range' in figure else None)
+
+            num_visible_curves = len([ c for c in group_curves if len(c['columns'] > 0) ])
 
             for curve in group_curves:
 
                 columns = curve['columns']
+                if len(columns) == 0:
+                    continue
 
                 # bokeh does not handle nan in python notebooks correctly, we 
                 # replace them with a string here
@@ -429,6 +456,11 @@ def plot(groups, figures, configurations, all_records):
                     draw_args['color'] = curve['color']
                     draw_args['size'] = 10
 
+                if curve['show_legend'] is not None:
+                    show_legend = curve['show_legend']
+                else:
+                    show_legend = num_visible_curves < 5
+
                 if show_legend:
                     draw_args['legend'] = curve['label']
 
@@ -438,18 +470,22 @@ def plot(groups, figures, configurations, all_records):
                         source=source,
                         **draw_args)
 
-            group_figures.append(group_figure)
+            if 'legend_position' in figure and len(group_figure.legend) > 0:
+                group_figure.legend[0].location = figure['legend_position']
 
-        group_grid = bokeh.layouts.gridplot([group_figures], title=get_title(group))
-        bokeh.plotting.show(group_grid)
+            if num_visible_curves > 0:
+                group_figures.append(group_figure)
+            else:
+                print("Skipping empty figure " + get_title(figure))
+
+        if len(group_figures) > 0:
+            group_grid = bokeh.layouts.gridplot([group_figures], title=get_title(group))
+            bokeh.plotting.show(group_grid)
+        else:
+            print("Skipping empty group " + get_title(group))
 
     print("Plotted in " + str(time.time() - start) + "s")
 
 def render_table(data):
     from IPython.core.display import HTML, display
     display(HTML(data.to_html()))
-
-if __name__ == '__main__':
-
-    verbose = True
-    read_all_results()
