@@ -11,7 +11,7 @@ import bokeh.palettes
 
 verbose = False
 
-configuration_keywords = ['color', 'label', 'style']
+configuration_keywords = ['color', 'label', 'style', 'title']
 
 colors_rgb = [
 [1, 0, 103],
