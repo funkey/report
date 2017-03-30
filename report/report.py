@@ -356,13 +356,13 @@ def create_bokeh_ybar_figure(title, figure_spec, curves):
     if df is None or len(df) == 0:
         return None
 
-    print(np.unique(df['label']))
     figure = bokeh.charts.Bar(
             df,
             values=figure_spec['y_axis'],
             label='label',
             title=title,
             active_scroll='wheel_zoom',
+            xlabel="",
             ylabel=figure_spec['y_label'] if 'y_label' in figure_spec else figure_spec['y_axis'],
             y_range=figure_spec['y_range'] if 'y_range' in figure_spec else None)
 
