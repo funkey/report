@@ -349,7 +349,6 @@ def create_bokeh_ybar_figure(title, figure_spec, curves):
             label='label',
             title=title,
             active_scroll='wheel_zoom',
-            xlabel=figure_spec['x_label'] if 'x_label' in figure_spec else figure_spec['x_axis'],
             ylabel=figure_spec['y_label'] if 'y_label' in figure_spec else figure_spec['y_axis'],
             y_range=figure_spec['y_range'] if 'y_range' in figure_spec else None)
 
