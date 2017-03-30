@@ -5,6 +5,7 @@ import json
 import pandas
 import numpy as np
 import bokeh.plotting
+import bokeh.charts
 import bokeh.layouts
 import bokeh.models
 import bokeh.palettes
@@ -314,6 +315,48 @@ def smooth(keys, values, factor):
 
 def create_figure(title, figure_spec, curves):
 
+    if figure_spec['x_axis'] == 'label':
+        return create_bokeh_ybar_figure(title, figure_spec, curves)
+
+    return create_bokeh_xy_figure(title, figure_spec, curves)
+
+def create_bokeh_ybar_figure(title, figure_spec, curves):
+
+    # put all curves into one data frame
+    df = None
+    for curve in curves:
+
+        if len(curve['records']) != 1:
+            if len(curve['records']) > 1:
+                print("Ignoring curve " + curve['label'] + " for bar plot, as it has more than one entry (%d)"%len(curve['records']))
+            continue
+
+        label = curve['label']
+        append = curve['records'].copy()
+        append['label'] = [label]
+        if df is None:
+            df = append
+        else:
+            df = df.append(append)
+
+    if df is None or len(df) == 0:
+        return None
+
+    print(np.unique(df['label']))
+    figure = bokeh.charts.Bar(
+            df,
+            values=figure_spec['y_axis'],
+            label='label',
+            title=title,
+            active_scroll='wheel_zoom',
+            xlabel=figure_spec['x_label'] if 'x_label' in figure_spec else figure_spec['x_axis'],
+            ylabel=figure_spec['y_label'] if 'y_label' in figure_spec else figure_spec['y_axis'],
+            y_range=figure_spec['y_range'] if 'y_range' in figure_spec else None)
+
+    return figure
+
+def create_bokeh_xy_figure(title, figure_spec, curves):
+
     # configure the tool-tip to show all keys common to all curves
     all_keys = None
     for curve in curves:
@@ -321,6 +364,8 @@ def create_figure(title, figure_spec, curves):
             all_keys = set(curve['records'].keys())
         else:
             all_keys &= set(curve['records'].keys())
+    all_keys = list(all_keys)
+    all_keys.sort()
     tooltips="".join([
         "<div><span>%s: @%s</span></div>"%(key,key) for key in all_keys
     ])
