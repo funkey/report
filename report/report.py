@@ -312,6 +312,92 @@ def smooth(keys, values, factor):
 
     return keys_mean, values_mean
 
+def create_figure(title, figure_spec, curves):
+
+    # configure the tool-tip to show all keys common to all curves
+    all_keys = None
+    for curve in curves:
+        if all_keys is None:
+            all_keys = set(curve['records'].keys())
+        else:
+            all_keys &= set(curve['records'].keys())
+    tooltips="".join([
+        "<div><span>%s: @%s</span></div>"%(key,key) for key in all_keys
+    ])
+    hover = bokeh.models.HoverTool(tooltips=tooltips)
+    tools = ['save','pan','wheel_zoom','box_zoom','reset']
+
+    # create the bokeh figure
+    figure = bokeh.plotting.figure(
+            title=title,
+            tools=[hover] + tools,
+            active_scroll='wheel_zoom',
+            x_axis_label=figure_spec['x_label'] if 'x_label' in figure_spec else figure_spec['x_axis'],
+            y_axis_label=figure_spec['y_label'] if 'y_label' in figure_spec else figure_spec['y_axis'],
+            x_range=figure_spec['x_range'] if 'x_range' in figure_spec else None,
+            y_range=figure_spec['y_range'] if 'y_range' in figure_spec else None)
+
+    num_visible_curves = len([ c for c in curves if len(c['records'] > 0) ])
+
+    if num_visible_curves == 0:
+        return None
+
+    for curve in curves:
+
+        records = curve['records']
+        if len(records) == 0:
+            continue
+
+        # bokeh does not handle nan in python notebooks correctly, we 
+        # replace them with a string here
+        records = records.fillna('nan')
+
+        if 'smooth' in figure_spec and figure_spec['smooth'] > 0:
+            x, y = smooth(records[figure_spec['x_axis']], records[figure_spec['y_axis']], figure_spec['smooth'])
+            source = bokeh.models.ColumnDataSource({figure_spec['x_axis']: x, figure_spec['y_axis']: y})
+        else:
+            source = bokeh.models.ColumnDataSource(bokeh.models.ColumnDataSource.from_df(records))
+
+        draw_function = figure.circle
+        draw_args = {}
+
+        if curve['style'] == 'line':
+
+            draw_function = figure.line
+            draw_args['line_color'] = curve['color']
+            draw_args['line_width'] = 2
+
+        elif curve['style'] == 'square':
+
+            draw_function = figure.square
+            draw_args['color'] = curve['color']
+            draw_args['size'] = 10
+
+        else:
+
+            draw_function = figure.circle
+            draw_args['color'] = curve['color']
+            draw_args['size'] = 10
+
+        if curve['show_legend'] is not None:
+            show_legend = curve['show_legend']
+        else:
+            show_legend = num_visible_curves < 5
+
+        if show_legend:
+            draw_args['legend'] = curve['label']
+
+        draw_function(
+                figure_spec['x_axis'],
+                figure_spec['y_axis'],
+                source=source,
+                **draw_args)
+
+    if 'legend_position' in figure_spec and len(figure.legend) > 0:
+        figure.legend[0].location = figure_spec['legend_position']
+
+    return figure
+
 def plot(groups, figures, configurations, all_records):
     '''Creates figures from the given records.
 
@@ -366,7 +452,7 @@ def plot(groups, figures, configurations, all_records):
 
             # create curve with meta-data
             curve = {
-                'columns': filtered_records,
+                'records': filtered_records,
                 'label': get_configuration_label(configuration),
                 'color': colors[configuration_num%len(colors)] if 'color' not in configuration else configuration['color'],
                 'style': configuration['style'] if 'style' in configuration else 'circle',
@@ -382,9 +468,6 @@ def plot(groups, figures, configurations, all_records):
 
     average_curve = {}
 
-    keys = list(all_records.keys())
-    keys.sort()
-
     # create the figures for each group
     for group in groups:
 
@@ -398,85 +481,15 @@ def plot(groups, figures, configurations, all_records):
             continue
 
         group_figures = []
-        for figure in figures:
+        for figure_spec in figures:
 
-            # configure the tool-tip to show all keys
-            tooltips="".join([
-                "<div><span>%s: @%s</span></div>"%(key,key) for key in keys
-            ])
-            hover = bokeh.models.HoverTool(tooltips=tooltips)
-            tools = ['save','pan','wheel_zoom','box_zoom','reset']
+            title = get_title(group) + " " + get_title(figure_spec)
+            group_figure = create_figure(title, figure_spec, group_curves)
 
-            # create the bokeh figure
-            group_figure = bokeh.plotting.figure(
-                    title=get_title(group) + " " + get_title(figure),
-                    tools=[hover] + tools,
-                    active_scroll='wheel_zoom',
-                    x_axis_label=figure['x_label'] if 'x_label' in figure else figure['x_axis'],
-                    y_axis_label=figure['y_label'] if 'y_label' in figure else figure['y_axis'],
-                    x_range=figure['x_range'] if 'x_range' in figure else None,
-                    y_range=figure['y_range'] if 'y_range' in figure else None)
-
-            num_visible_curves = len([ c for c in group_curves if len(c['columns'] > 0) ])
-
-            for curve in group_curves:
-
-                columns = curve['columns']
-                if len(columns) == 0:
-                    continue
-
-                # bokeh does not handle nan in python notebooks correctly, we 
-                # replace them with a string here
-                columns = columns.fillna('nan')
-
-                if 'smooth' in figure and figure['smooth'] > 0:
-                    x, y = smooth(columns[figure['x_axis']], columns[figure['y_axis']], figure['smooth'])
-                    source = bokeh.models.ColumnDataSource({figure['x_axis']: x, figure['y_axis']: y})
-                else:
-                    source = bokeh.models.ColumnDataSource(bokeh.models.ColumnDataSource.from_df(columns))
-
-                draw_function = group_figure.circle
-                draw_args = {}
-
-                if curve['style'] == 'line':
-
-                    draw_function = group_figure.line
-                    draw_args['line_color'] = curve['color']
-                    draw_args['line_width'] = 2
-
-                elif curve['style'] == 'square':
-
-                    draw_function = group_figure.square
-                    draw_args['color'] = curve['color']
-                    draw_args['size'] = 10
-
-                else:
-
-                    draw_function = group_figure.circle
-                    draw_args['color'] = curve['color']
-                    draw_args['size'] = 10
-
-                if curve['show_legend'] is not None:
-                    show_legend = curve['show_legend']
-                else:
-                    show_legend = num_visible_curves < 5
-
-                if show_legend:
-                    draw_args['legend'] = curve['label']
-
-                draw_function(
-                        figure['x_axis'],
-                        figure['y_axis'],
-                        source=source,
-                        **draw_args)
-
-            if 'legend_position' in figure and len(group_figure.legend) > 0:
-                group_figure.legend[0].location = figure['legend_position']
-
-            if num_visible_curves > 0:
+            if group_figure is not None:
                 group_figures.append(group_figure)
             else:
-                print("Skipping empty figure " + get_title(figure))
+                print("Skipping empty figure " + get_title(figure_spec))
 
         if len(group_figures) > 0:
             group_grid = bokeh.layouts.gridplot([group_figures], title=get_title(group))
