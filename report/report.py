@@ -629,7 +629,12 @@ def create_tikz_ybar_figure(title, figure_spec, curves):
 
     return figure.format(**figure_data)
 
-def plot(groups, figures, configurations, all_records, backend='bokeh'):
+def escape(s):
+    s = s.replace(' ','_')
+    s = s.replace('/','_')
+    return s
+
+def plot(groups, figures, configurations, all_records, backend='bokeh', output_dir='plots'):
     '''Creates figures from the given records.
 
     Figures are created for each given group.
@@ -708,7 +713,7 @@ def plot(groups, figures, configurations, all_records, backend='bokeh'):
     average_curve = {}
 
     # create the figures for each group
-    all_figures = []
+    all_figures = {}
     for group in groups:
 
         if isinstance(group, str) and group == 'average':
@@ -728,10 +733,9 @@ def plot(groups, figures, configurations, all_records, backend='bokeh'):
 
             if group_figure is not None:
                 group_figures.append(group_figure)
+                all_figures[title] = group_figure
             else:
                 print("Skipping empty figure " + get_title(figure_spec))
-
-        all_figures += group_figures
 
         if len(group_figures) > 0:
 
@@ -742,6 +746,18 @@ def plot(groups, figures, configurations, all_records, backend='bokeh'):
             print("Skipping empty group " + get_title(group))
 
     print("Plotted in " + str(time.time() - start) + "s")
+
+    if backend == 'tikz':
+
+        try:
+            os.mkdir(output_dir)
+        except:
+            pass
+
+        for title in all_figures:
+            filename = escape(title)
+            with open(os.path.join(output_dir, filename + '.tikz.tex'), 'w') as f:
+                f.write(all_figures[title])
 
     return all_figures
 
