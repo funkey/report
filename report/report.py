@@ -189,10 +189,24 @@ def read_all_results(data_backend = 'json_files', row_generator = None, **kwargs
         pass
 
     try:
+        vs = data_frame['syn_voi_split']
+        vm = data_frame['syn_voi_merge']
+        data_frame['syn_voi_sum'] = np.array(vs + vm, dtype=np.float32)
+    except:
+        pass
+
+    try:
         rs = data_frame['rand_split']
         rm = data_frame['rand_merge']
         data_frame['arand'] = np.array(1.0 - (2.0*rs*rm)/(rs+rm), dtype=np.float32)
         data_frame['cremi_score'] = np.sqrt(np.array(data_frame['voi_sum']*data_frame['arand'], dtype=np.float32))
+    except:
+        pass
+
+    try:
+        rs = data_frame['syn_rand_split']
+        rm = data_frame['syn_rand_merge']
+        data_frame['syn_arand'] = np.array(1.0 - (2.0*rs*rm)/(rs+rm), dtype=np.float32)
     except:
         pass
 
