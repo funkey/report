@@ -18,6 +18,16 @@ def set_verbose(v):
 
 configuration_keywords = ['color', 'label', 'style', 'title', 'show_legend']
 
+colors_tikz = [
+    'red!75!black',
+    'blue!50!white',
+    'black',
+    'green!75!black',
+    'brown',
+    'blue!50!green!75!black',
+    'purple!75!black',
+]
+
 colors_rgb = [
 [1, 0, 103],
 [213, 255, 0],
@@ -83,7 +93,6 @@ colors_rgb = [
 [255, 110, 65],
 [232, 94, 190]
 ]
-colors = [ '#%02x%02x%02x'%tuple(c) for c in colors_rgb ]
 
 # decorator for filter configurations that allow multiple values
 class Any:
@@ -327,46 +336,20 @@ def smooth(keys, values, factor):
 
     return keys_mean, values_mean
 
-def create_figure(title, figure_spec, curves):
+def create_figure(title, figure_spec, curves, backend):
 
     if figure_spec['x_axis'] == 'label':
-        return create_bokeh_ybar_figure(title, figure_spec, curves)
-
-    return create_bokeh_xy_figure(title, figure_spec, curves)
-
-def create_bokeh_ybar_figure(title, figure_spec, curves):
-
-    # put all curves into one data frame
-    df = None
-    for curve in curves:
-
-        if len(curve['records']) != 1:
-            if len(curve['records']) > 1:
-                print("Ignoring curve " + curve['label'] + " for bar plot, as it has more than one entry (%d)"%len(curve['records']))
-            continue
-
-        label = curve['label']
-        append = curve['records'].copy()
-        append['label'] = [label]
-        if df is None:
-            df = append
+        if backend == 'bokeh':
+            return create_bokeh_ybar_figure(title, figure_spec, curves)
         else:
-            df = df.append(append)
+            return create_tikz_ybar_figure(title, figure_spec, curves)
 
-    if df is None or len(df) == 0:
-        return None
-
-    figure = bokeh.charts.Bar(
-            df,
-            values=figure_spec['y_axis'],
-            label='label',
-            title=title,
-            active_scroll='wheel_zoom',
-            xlabel="",
-            ylabel=figure_spec['y_label'] if 'y_label' in figure_spec else figure_spec['y_axis'],
-            y_range=figure_spec['y_range'] if 'y_range' in figure_spec else None)
-
-    return figure
+    if backend == 'bokeh':
+        return create_bokeh_xy_figure(title, figure_spec, curves)
+    elif backend == 'tikz':
+        return create_tikz_xy_figure(title, figure_spec, curves)
+    else:
+        raise RuntimeError("No such backend " + backend)
 
 def create_bokeh_xy_figure(title, figure_spec, curves):
 
@@ -419,22 +402,26 @@ def create_bokeh_xy_figure(title, figure_spec, curves):
         draw_function = figure.circle
         draw_args = {}
 
+        color = curve['color']
+        if isinstance(color, int):
+            color = '#%02x%02x%02x'%tuple(colors_rgb[color%len(colors_rgb)])
+
         if curve['style'] == 'line':
 
             draw_function = figure.line
-            draw_args['line_color'] = curve['color']
+            draw_args['line_color'] = color
             draw_args['line_width'] = 2
 
         elif curve['style'] == 'square':
 
             draw_function = figure.square
-            draw_args['color'] = curve['color']
+            draw_args['color'] = color
             draw_args['size'] = 10
 
         else:
 
             draw_function = figure.circle
-            draw_args['color'] = curve['color']
+            draw_args['color'] = color
             draw_args['size'] = 10
 
         if curve['show_legend'] is not None:
@@ -456,7 +443,193 @@ def create_bokeh_xy_figure(title, figure_spec, curves):
 
     return figure
 
-def plot(groups, figures, configurations, all_records):
+def create_bokeh_ybar_figure(title, figure_spec, curves):
+
+    # put all curves into one data frame
+    df = None
+    for curve in curves:
+
+        if len(curve['records']) != 1:
+            if len(curve['records']) > 1:
+                print("Ignoring curve " + curve['label'] + " for bar plot, as it has more than one entry (%d)"%len(curve['records']))
+            continue
+
+        label = curve['label']
+        append = curve['records'].copy()
+        append['label'] = [label]
+        if df is None:
+            df = append
+        else:
+            df = df.append(append)
+
+    if df is None or len(df) == 0:
+        return None
+
+    figure = bokeh.charts.Bar(
+            df,
+            values=figure_spec['y_axis'],
+            label='label',
+            title=title,
+            active_scroll='wheel_zoom',
+            xlabel="",
+            ylabel=figure_spec['y_label'] if 'y_label' in figure_spec else figure_spec['y_axis'],
+            y_range=figure_spec['y_range'] if 'y_range' in figure_spec else None)
+
+    return figure
+
+def create_tikz_xy_figure(title, figure_spec, curves):
+
+    num_visible_curves = len([ c for c in curves if len(c['records'] > 0) ])
+
+    if num_visible_curves == 0:
+        return None
+
+    figure = """
+\\begin{{tikzpicture}}
+    \\begin{{axis}}[
+        ymajorgrids=true,
+        xmajorgrids=true,
+        width=\\plotwidth,
+        height=\\plotheight,
+        legend columns=2,
+        xlabel={xlabel},
+        ylabel={ylabel},
+        axis equal
+        {style}
+    ]
+        {plots}
+    \\end{{axis}}
+\\end{{tikzpicture}}
+"""
+
+    figure_data = {
+        'style': '',
+        'xlabel': figure_spec['x_label'] if 'x_label' in figure_spec else figure_spec['x_axis'],
+        'ylabel': figure_spec['y_label'] if 'y_label' in figure_spec else figure_spec['y_axis'],
+        'plots': ''
+    }
+
+    if 'x_range' in figure_spec:
+        xmin = min(figure_spec['x_range'])
+        xmax = max(figure_spec['x_range'])
+        figure_data['style'] += ',xmin=%f,xmax=%f'%(xmin,xmax)
+        if figure_spec['x_range'][0] > figure_spec['x_range'][1]:
+            figure_data['style'] += ',x dir=reverse'
+    if 'y_range' in figure_spec:
+        ymin = min(figure_spec['y_range'])
+        ymax = max(figure_spec['y_range'])
+        figure_data['style'] += ',ymin=%f,ymax=%f'%(ymin,ymax)
+        if figure_spec['y_range'][0] > figure_spec['y_range'][1]:
+            figure_data['style'] += ',y dir=reverse'
+
+    for curve in curves:
+
+        records = curve['records']
+        if len(records) == 0:
+            continue
+
+        if 'smooth' in figure_spec and figure_spec['smooth'] > 0:
+            x, y = smooth(records[figure_spec['x_axis']], records[figure_spec['y_axis']], figure_spec['smooth'])
+            source = pandas.DataFrame({figure_spec['x_axis']: x, figure_spec['y_axis']: y})
+        else:
+            source = records
+
+        plot = """
+    \\addplot[{style},{color}]
+        coordinates {{
+            {coordinates}
+        }};
+    \\addlegendentry{{ {label} }}
+"""
+
+        color = curve['color']
+        if isinstance(color, int):
+            color = colors_tikz[color%len(colors_tikz)]
+        plot_data = {
+            'style': '',
+            'color': color,
+            'coordinates': '',
+            'label': curve['label']
+        }
+
+        if curve['style'] == 'square':
+            plot_data['style'] += ',only marks,mark=square'
+        elif curve['style'] == 'circle':
+            plot_data['style'] += ',only marks,mark=*'
+
+        x = figure_spec['x_axis']
+        y = figure_spec['y_axis']
+
+        for row in source.iterrows():
+            plot_data['coordinates'] += '(%f,%f)'%(row[1][x],row[1][y])
+
+        figure_data['plots'] += plot.format(**plot_data)
+
+    return figure.format(**figure_data)
+
+def create_tikz_ybar_figure(title, figure_spec, curves):
+
+    # put all curves into one data frame
+    df = None
+    for curve in curves:
+
+        if len(curve['records']) != 1:
+            if len(curve['records']) > 1:
+                print("Ignoring curve " + curve['label'] + " for bar plot, as it has more than one entry (%d)"%len(curve['records']))
+            continue
+
+        label = curve['label']
+        append = curve['records'].copy()
+        append['label'] = [label]
+        if df is None:
+            df = append
+        else:
+            df = df.append(append)
+
+    if df is None or len(df) == 0:
+        return None
+
+    figure = """
+\\begin{{tikzpicture}}
+    \\begin{{axis}}[
+        symbolic x coords={{{labels}}},
+        xtick=data,
+        ymajorgrids=true,
+        width=\\plotwidth,
+        height=\\plotheight,
+        legend columns=2,
+        ylabel={ylabel},{style},
+    ]
+
+        \\addplot[ybar,fill=blue!50!white] coordinates {{
+            {coordinates}
+        }};
+
+    \\end{{axis}}
+\\end{{tikzpicture}}
+"""
+
+    figure_data = {
+        'style': '',
+        'ylabel': figure_spec['y_label'] if 'y_label' in figure_spec else figure_spec['y_axis'],
+        'labels': '',
+        'coordinates': ''
+    }
+
+    if 'y_range' in figure_spec:
+        ymin = min(figure_spec['y_range'])
+        ymax = max(figure_spec['y_range'])
+        figure_data['style'] += ',ymin=%f,ymax=%f'%(ymin,ymax)
+        if figure_spec['y_range'][0] > figure_spec['y_range'][1]:
+            figure_data['style'] += ',y dir=reverse'
+
+    figure_data['labels'] = ','.join(df['label'])
+    for label, value in zip(df['label'],df[figure_spec['y_axis']]):
+        figure_data['coordinates'] += '(%s,%f)'%(label, value)
+
+    return figure.format(**figure_data)
+
+def plot(groups, figures, configurations, all_records, backend='bokeh'):
     '''Creates figures from the given records.
 
     Figures are created for each given group.
@@ -487,6 +660,14 @@ def plot(groups, figures, configurations, all_records):
     # list of curves per group, identified by title
     curves = { get_title(group): [] for group in groups }
 
+    configuration_labels = [ get_configuration_label(c) for c in configurations ]
+    configuration_indices = {}
+    i = 0
+    for l in configuration_labels:
+        if l not in configuration_indices:
+            configuration_indices[l] = i
+            i += 1
+
     # prepare panda data frames for each curve in each group
     for group in groups:
 
@@ -512,7 +693,7 @@ def plot(groups, figures, configurations, all_records):
             curve = {
                 'records': filtered_records,
                 'label': get_configuration_label(configuration),
-                'color': colors[configuration_num%len(colors)] if 'color' not in configuration else configuration['color'],
+                'color': configuration_indices[get_configuration_label(configuration)] if 'color' not in configuration else configuration['color'],
                 'style': configuration['style'] if 'style' in configuration else 'circle',
                 'show_legend': configuration['show_legend'] if 'show_legend' in configuration else show_legend_group_default
             }
@@ -527,6 +708,7 @@ def plot(groups, figures, configurations, all_records):
     average_curve = {}
 
     # create the figures for each group
+    all_figures = []
     for group in groups:
 
         if isinstance(group, str) and group == 'average':
@@ -542,20 +724,26 @@ def plot(groups, figures, configurations, all_records):
         for figure_spec in figures:
 
             title = get_title(group) + " " + get_title(figure_spec)
-            group_figure = create_figure(title, figure_spec, group_curves)
+            group_figure = create_figure(title, figure_spec, group_curves, backend)
 
             if group_figure is not None:
                 group_figures.append(group_figure)
             else:
                 print("Skipping empty figure " + get_title(figure_spec))
 
+        all_figures += group_figures
+
         if len(group_figures) > 0:
-            group_grid = bokeh.layouts.gridplot([group_figures], title=get_title(group))
-            bokeh.plotting.show(group_grid)
+
+            if backend == 'bokeh':
+                group_grid = bokeh.layouts.gridplot([group_figures], title=get_title(group))
+                bokeh.plotting.show(group_grid)
         else:
             print("Skipping empty group " + get_title(group))
 
     print("Plotted in " + str(time.time() - start) + "s")
+
+    return all_figures
 
 def render_table(data):
     from IPython.core.display import HTML, display
