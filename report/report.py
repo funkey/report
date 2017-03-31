@@ -16,6 +16,8 @@ def set_verbose(v):
     global verbose
     verbose = v
 
+eps = 0.000001
+
 configuration_keywords = ['color', 'label', 'style', 'title', 'show_legend']
 
 colors_tikz = [
@@ -287,7 +289,10 @@ def filter(records, configurations):
                 if value is None or value is np.nan:
                     expression = (pandas.isnull(records[k]))
                 else:
-                    expression = (records[k] == value)
+                    if isinstance(value, float):
+                        expression = ((records[k] >= value - eps) & (records[k] <= value + eps))
+                    else:
+                        expression = (records[k] == value)
                 if value_mask is None:
                     value_mask = expression
                 else:
