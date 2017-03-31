@@ -491,10 +491,15 @@ def create_tikz_xy_figure(title, figure_spec, curves):
         xmajorgrids=true,
         width=\\plotwidth,
         height=\\plotheight,
+        legend style={{font=\\tiny}},
+        legend image post style={{scale=0.5}},
         legend columns=2,
         xlabel={xlabel},
         ylabel={ylabel},
-        axis equal
+        xticklabel style={{font=\\tiny,overlay}},
+        yticklabel style={{font=\\tiny,overlay}},
+        ylabel style={{font=\\tiny,overlay}},
+        xlabel style={{font=\\tiny,overlay}},
         {style}
     ]
         {plots}
@@ -509,18 +514,18 @@ def create_tikz_xy_figure(title, figure_spec, curves):
         'plots': ''
     }
 
-    if 'x_range' in figure_spec:
-        xmin = min(figure_spec['x_range'])
-        xmax = max(figure_spec['x_range'])
-        figure_data['style'] += ',xmin=%f,xmax=%f'%(xmin,xmax)
-        if figure_spec['x_range'][0] > figure_spec['x_range'][1]:
-            figure_data['style'] += ',x dir=reverse'
-    if 'y_range' in figure_spec:
-        ymin = min(figure_spec['y_range'])
-        ymax = max(figure_spec['y_range'])
-        figure_data['style'] += ',ymin=%f,ymax=%f'%(ymin,ymax)
-        if figure_spec['y_range'][0] > figure_spec['y_range'][1]:
-            figure_data['style'] += ',y dir=reverse'
+    for a in ['x', 'y']:
+        if a+'_range' in figure_spec:
+
+            amin, amax = figure_spec[a+'_range']
+
+            if amin is not None and amax is not None and amin > amax:
+                amin, amax = amax, amin
+                figure_data['style'] += ','+a+' dir=reverse'
+            if amin is not None:
+                figure_data['style'] += ','+a+'min=%f'%amin
+            if amax is not None:
+                figure_data['style'] += ','+a+'max=%f'%amax
 
     for curve in curves:
 
@@ -597,8 +602,14 @@ def create_tikz_ybar_figure(title, figure_spec, curves):
         ymajorgrids=true,
         width=\\plotwidth,
         height=\\plotheight,
+        legend style={{font=\\tiny}},
+        legend image post style={{scale=0.5}},
         legend columns=2,
         ylabel={ylabel},{style},
+        xticklabel style={{font=\\tiny,overlay}},
+        yticklabel style={{font=\\tiny,overlay}},
+        ylabel style={{font=\\tiny,overlay}},
+        xlabel style={{font=\\tiny,overlay}},
     ]
 
         \\addplot[ybar,fill=blue!50!white] coordinates {{
