@@ -739,16 +739,11 @@ def plot(groups, figures, configurations, all_records, backend='bokeh', output_d
     # plotting
     start = time.time()
 
-    average_curve = {}
-
     # create the figures for each group
     all_figures = {}
     for group in groups:
 
-        if isinstance(group, str) and group == 'average':
-            group_curves = [ v for (_,v) in average_curve.iteritems() ]
-        else:
-            group_curves = curves[get_title(group)]
+        group_curves = curves[get_title(group)]
 
         if len(group_curves) == 0:
             print("No record matches group " + get_title(group))
