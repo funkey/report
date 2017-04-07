@@ -18,7 +18,7 @@ def set_verbose(v):
 
 eps = 0.000001
 
-configuration_keywords = ['color', 'label', 'style', 'title', 'show_legend']
+configuration_keywords = ['color', 'label', 'style', 'title', 'show_legend', 'legend_columns']
 
 colors_tikz = [
     'red!75!black',
@@ -498,14 +498,13 @@ def create_tikz_xy_figure(title, figure_spec, curves):
         height=\\plotheight,
         legend style={{font=\\tiny}},
         legend image post style={{scale=0.5}},
-        legend columns=2,
+        legend columns={legend_columns},
         xlabel={xlabel},
         ylabel={ylabel},
         xticklabel style={{font=\\tiny,overlay}},
         yticklabel style={{font=\\tiny,overlay}},
         ylabel style={{font=\\tiny,overlay}},
-        xlabel style={{font=\\tiny,overlay}},
-        {style}
+        xlabel style={{font=\\tiny,overlay}},{style}
     ]
         {plots}
     \\end{{axis}}
@@ -516,7 +515,8 @@ def create_tikz_xy_figure(title, figure_spec, curves):
         'style': '',
         'xlabel': figure_spec['x_label'] if 'x_label' in figure_spec else figure_spec['x_axis'],
         'ylabel': figure_spec['y_label'] if 'y_label' in figure_spec else figure_spec['y_axis'],
-        'plots': ''
+        'plots': '',
+        'legend_columns': figure_spec['legend_columns'] if 'legend_columns' in figure_spec else 1
     }
 
     for a in ['x', 'y']:
@@ -531,6 +531,9 @@ def create_tikz_xy_figure(title, figure_spec, curves):
                 figure_data['style'] += ','+a+'min=%f'%amin
             if amax is not None:
                 figure_data['style'] += ','+a+'max=%f'%amax
+
+        if a+'_mode' in figure_spec:
+            figure_data['style'] += ','+a+'mode=%s'%figure_spec[a+'_mode']
 
     for curve in curves:
 
@@ -633,11 +636,21 @@ def create_tikz_ybar_figure(title, figure_spec, curves):
     }
 
     if 'y_range' in figure_spec:
-        ymin = min(figure_spec['y_range'])
-        ymax = max(figure_spec['y_range'])
-        figure_data['style'] += ',ymin=%f,ymax=%f'%(ymin,ymax)
-        if figure_spec['y_range'][0] > figure_spec['y_range'][1]:
-            figure_data['style'] += ',y dir=reverse'
+        ymin = figure_spec['y_range'][0]
+        ymax = figure_spec['y_range'][1]
+        if ymin is not None and ymax is not None:
+            if ymin > ymax:
+                ymin, ymax = ymax, ymin
+                figure_data['style'] += ',y dir=reverse'
+        if ymin is not None:
+            figure_data['style'] += ',ymin=%f'%ymin
+        if ymax is not None:
+            figure_data['style'] += ',ymax=%f'%ymax
+
+    if 'x_mode' in figure_spec:
+        figure_data['style'] += ',xmode=%s'%figure_spec['x_mode']
+    if 'y_mode' in figure_spec:
+        figure_data['style'] += ',ymode=%s'%figure_spec['y_mode']
 
     figure_data['labels'] = ','.join(df['label'])
     for label, value in zip(df['label'],df[figure_spec['y_axis']]):
