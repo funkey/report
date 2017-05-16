@@ -18,7 +18,7 @@ def set_verbose(v):
 
 eps = 0.000001
 
-configuration_keywords = ['color', 'label', 'style', 'title', 'show_legend', 'legend_columns']
+configuration_keywords = ['color', 'label', 'style', 'title', 'show_legend', 'legend_columns', 'columns']
 
 colors_tikz = [
     'red!75!black',
@@ -411,11 +411,13 @@ def create_bokeh_xy_figure(title, figure_spec, curves):
         if isinstance(color, int):
             color = '#%02x%02x%02x'%tuple(colors_rgb[color%len(colors_rgb)])
 
-        if curve['style'] == 'line':
+        if curve['style'] in ['line', 'dashed', 'dotted']:
 
             draw_function = figure.line
             draw_args['line_color'] = color
             draw_args['line_width'] = 2
+            if curve['style'] in ['dashed', 'dotted']:
+                draw_args['line_dash'] = curve['style']
 
         elif curve['style'] == 'square':
 
@@ -658,6 +660,79 @@ def create_tikz_ybar_figure(title, figure_spec, curves):
 
     return figure.format(**figure_data)
 
+def create_html_table(title, data):
+
+    from IPython.core.display import HTML, display
+    display(HTML('<h3>' + title + '</h3>'))
+    display(HTML(data.to_html()))
+
+def create_tex_table(title, data, highlight_min=None, highlight_max=None, label_name=''):
+
+    table = """\\rowcolors{{3}}{{gray!12!white}}{{gray!2!white}}
+\\begin{{tabular}}{{{format}}}
+    \\multicolumn{{{num_columns}}}{{c}}{{{title}}}\\\\[2mm]
+    {head}
+    \\hline
+{rows}
+\\end{{tabular}}
+"""
+
+    num_rows = len(data)
+    num_columns = len(data.columns)
+
+    column_indices = { name: index for (index, name) in enumerate(data.columns) }
+
+    values = np.zeros((num_rows, num_columns))
+    highlight = np.zeros((num_rows, num_columns))
+    i = 0
+    for (label, row) in data.iterrows():
+        j = 0
+        for x in row:
+            values[i,j] = x
+            j += 1
+        i += 1
+
+    if highlight_min is not None:
+        for name in highlight_min:
+            i = np.argmin(values[:,column_indices[name]])
+            highlight[i,column_indices[name]] = 1
+    if highlight_max is not None:
+        for name in highlight_max:
+            i = np.argmax(values[:,column_indices[name]])
+            highlight[i,column_indices[name]] = 1
+
+    head = label_name + '&'+'&'.join([format_tabular_cell(x, numeric=False) for x in data.columns])+'\\\\\n'
+    rows = '\\\\\n'.join(
+            [
+                data.index[i] + '&' + \
+                    '&'.join([format_tabular_cell(values[i,j], highlight[i,j]==1) for j in range(num_columns)])
+                for i in range(num_rows)
+            ]
+    )
+
+    return table.format(**{
+        'format':'l|'+'d'*num_columns,
+        'num_columns':num_columns+1,
+        'title':title,
+        'head':head,
+        'rows':rows,
+    })
+
+def format_tabular_cell(s, highlight=False, numeric=True):
+
+    if highlight and not numeric:
+        s = '{\\bf ' + s + '}'
+
+    if numeric:
+        s = '%.3f'%s
+    else:
+        s = '\\multicolumn{1}{c}{'+s+'}'
+
+    if highlight and numeric:
+        s = '\\multicolumn{1}{B{.}{.}{-1} }{'+s+'}'
+
+    return s
+
 def escape(s):
     s = s.replace(' ','_')
     s = s.replace('/','_')
@@ -785,6 +860,45 @@ def plot(groups, figures, configurations, all_records, backend='bokeh', output_d
 
     return all_figures
 
+def table(tables, configurations, results, backend='html', output_dir='tables', filename=None, **kwargs):
+
+    for table in tables:
+
+        table_data = pandas.DataFrame()
+        title = get_title(table)
+
+        for configuration in configurations:
+
+            rows = filter(results, [configuration])
+            if len(rows) == 0:
+                continue
+
+            if 'columns' in table:
+                rows = rows[table['columns']]
+
+                if 'column_names' in table:
+                    rows.rename(columns = {old: new for old, new in zip(table['columns'], table['column_names']) }, inplace=True)
+
+            rows.loc[:,'label'] = pandas.Series([get_configuration_label(configuration)]*len(rows), index=rows.index)
+            rows = rows.set_index('label')
+            rows.index.name = None # oh, of course, because otherwise we get an empyt row! m(
+
+            table_data = table_data.append(rows)
+
+        if backend == 'tex':
+
+            try:
+                os.mkdir(output_dir)
+            except:
+                pass
+
+            if filename is None:
+                filename = escape(title) + '.tex'
+            with open(os.path.join(output_dir, filename), 'w') as f:
+                f.write(create_tex_table(title, table_data, **kwargs))
+        else:
+            create_html_table(title, table_data)
+
+
 def render_table(data):
-    from IPython.core.display import HTML, display
-    display(HTML(data.to_html()))
+    create_html_table("", data)
