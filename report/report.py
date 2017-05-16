@@ -860,7 +860,7 @@ def plot(groups, figures, configurations, all_records, backend='bokeh', output_d
 
     return all_figures
 
-def table(tables, configurations, results, backend='html', output_dir='tables', filename=None, **kwargs):
+def table(tables, configurations, results, collapse_configurations=None, backend='html', output_dir='tables', filename=None, **kwargs):
 
     for table in tables:
 
@@ -878,6 +878,16 @@ def table(tables, configurations, results, backend='html', output_dir='tables', 
 
                 if 'column_names' in table:
                     rows.rename(columns = {old: new for old, new in zip(table['columns'], table['column_names']) }, inplace=True)
+
+            if collapse_configurations is not None:
+                method, column = collapse_configurations
+                rows = rows.sort_values(by=column)
+                if method == 'min':
+                    rows = rows.head(1)
+                elif method == 'max':
+                    rows = rows.tail(1)
+                else:
+                    raise RuntimeError("method for collapsing has to be 'min' or 'max'")
 
             rows.loc[:,'label'] = pandas.Series([get_configuration_label(configuration)]*len(rows), index=rows.index)
             rows = rows.set_index('label')
