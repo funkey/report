@@ -2,3 +2,4 @@ build/
 dist/
 report.egg-info/
 *.pyc
+*.swp
