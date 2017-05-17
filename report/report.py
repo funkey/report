@@ -9,6 +9,7 @@ import bokeh.charts
 import bokeh.layouts
 import bokeh.models
 import bokeh.palettes
+from IPython.core.display import HTML, display
 
 verbose = False
 
@@ -371,7 +372,7 @@ def create_bokeh_xy_figure(title, figure_spec, curves):
         "<div><span>%s: @%s</span></div>"%(key,key) for key in all_keys
     ])
     hover = bokeh.models.HoverTool(tooltips=tooltips)
-    tools = ['save','pan','wheel_zoom','box_zoom','reset']
+    tools = ['save','pan','wheel_zoom','box_zoom','reset', 'resize']
 
     # create the bokeh figure
     figure = bokeh.plotting.figure(
@@ -660,11 +661,21 @@ def create_tikz_ybar_figure(title, figure_spec, curves):
 
     return figure.format(**figure_data)
 
-def create_html_table(title, data):
+def create_html_table(title, data, highlight_min=None, highlight_max=None, label_name=''):
 
-    from IPython.core.display import HTML, display
     display(HTML('<h3>' + title + '</h3>'))
-    display(HTML(data.to_html()))
+
+    if len(data) == 0:
+        display(HTML('[empty]'))
+        return
+
+    styler = data.style
+    if highlight_min is not None:
+        styler = styler.apply(pandas_highlight_min, subset=highlight_min)
+    if highlight_max is not None:
+        styler = styler.apply(pandas_highlight_max, subset=highlight_max)
+
+    display(HTML(styler.render()))
 
 def create_tex_table(title, data, highlight_min=None, highlight_max=None, label_name=''):
 
@@ -860,55 +871,75 @@ def plot(groups, figures, configurations, all_records, backend='bokeh', output_d
 
     return all_figures
 
-def table(tables, configurations, results, collapse_configurations=None, backend='html', output_dir='tables', filename=None, **kwargs):
+def table(tables, configurations, results, groups=None, collapse_configurations=None, backend='html', output_dir='tables', filename=None, **kwargs):
+    '''
+    If groups is set, multiple tables are rendered, filtered for each group.
+    '''
 
-    for table in tables:
+    if groups is None:
+        groups = [None]
 
-        table_data = pandas.DataFrame()
-        title = get_title(table)
+    for group in groups:
+        for table in tables:
 
-        for configuration in configurations:
+            table_data = pandas.DataFrame()
+            title = get_title(table)
+            if group is not None:
+                title += ' ' + get_title(group)
 
-            rows = filter(results, [configuration])
-            if len(rows) == 0:
-                continue
+            for configuration in configurations:
 
-            if 'columns' in table:
-                rows = rows[table['columns']]
-
-                if 'column_names' in table:
-                    rows.rename(columns = {old: new for old, new in zip(table['columns'], table['column_names']) }, inplace=True)
-
-            if collapse_configurations is not None:
-                method, column = collapse_configurations
-                rows = rows.sort_values(by=column)
-                if method == 'min':
-                    rows = rows.head(1)
-                elif method == 'max':
-                    rows = rows.tail(1)
+                if group is not None:
+                    rows = filter(results, [configuration, group])
                 else:
-                    raise RuntimeError("method for collapsing has to be 'min' or 'max'")
+                    rows = filter(results, [configuration])
+                if len(rows) == 0:
+                    continue
 
-            rows.loc[:,'label'] = pandas.Series([get_configuration_label(configuration)]*len(rows), index=rows.index)
-            rows = rows.set_index('label')
-            rows.index.name = None # oh, of course, because otherwise we get an empyt row! m(
+                if 'columns' in table:
+                    rows = rows[table['columns']]
 
-            table_data = table_data.append(rows)
+                    if 'column_names' in table:
+                        rows.rename(columns = {old: new for old, new in zip(table['columns'], table['column_names']) }, inplace=True)
 
-        if backend == 'tex':
+                if collapse_configurations is not None:
+                    method, column = collapse_configurations
+                    rows = rows.sort_values(by=column)
+                    if method == 'min':
+                        rows = rows.head(1)
+                    elif method == 'max':
+                        rows = rows.tail(1)
+                    else:
+                        raise RuntimeError("method for collapsing has to be 'min' or 'max'")
 
-            try:
-                os.mkdir(output_dir)
-            except:
-                pass
+                rows.loc[:,'label'] = pandas.Series([get_configuration_label(configuration)]*len(rows), index=rows.index)
+                rows = rows.set_index('label')
+                rows.index.name = None # oh, of course, because otherwise we get an empyt row! m(
 
-            if filename is None:
-                filename = escape(title) + '.tex'
-            with open(os.path.join(output_dir, filename), 'w') as f:
-                f.write(create_tex_table(title, table_data, **kwargs))
-        else:
-            create_html_table(title, table_data)
+                table_data = table_data.append(rows)
+
+            if backend == 'tex':
+
+                try:
+                    os.mkdir(output_dir)
+                except:
+                    pass
+
+                if filename is None:
+                    filename = escape(title) + '.tex'
+                with open(os.path.join(output_dir, filename), 'w') as f:
+                    f.write(create_tex_table(title, table_data, **kwargs))
+            else:
+                create_html_table(title, table_data, **kwargs)
 
 
 def render_table(data):
     create_html_table("", data)
+
+def pandas_highlight_min(s):
+    is_min = s == s.min()
+    return ['background-color: yellow' if v else '' for v in is_min]
+
+def pandas_highlight_max(s):
+    is_max = s == s.max()
+    return ['background-color: yellow' if v else '' for v in is_max]
