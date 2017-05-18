@@ -677,11 +677,10 @@ def create_html_table(title, data, highlight_min=None, highlight_max=None, label
 
     display(HTML(styler.render()))
 
-def create_tex_table(title, data, highlight_min=None, highlight_max=None, label_name=''):
+def create_tex_table(title, data, highlight_min=None, highlight_max=None, label_name='', precisions = {}):
 
-    table = """\\rowcolors{{3}}{{gray!12!white}}{{gray!2!white}}
+    table = """\\rowcolors{{2}}{{gray!2!white}}{{gray!12!white}}
 \\begin{{tabular}}{{{format}}}
-    \\multicolumn{{{num_columns}}}{{c}}{{{title}}}\\\\[2mm]
     {head}
     \\hline
 {rows}
@@ -712,35 +711,54 @@ def create_tex_table(title, data, highlight_min=None, highlight_max=None, label_
             i = np.argmax(values[:,column_indices[name]])
             highlight[i,column_indices[name]] = 1
 
+    for column in data.columns:
+        if column not in precisions:
+            precisions[column] = 3
+
+    format = 'l|' + ''.join([
+        'D{.}{.}{'+str(precisions[column])+'}'
+        for column in data.columns
+    ])
+
     head = label_name + '&'+'&'.join([format_tabular_cell(x, numeric=False) for x in data.columns])+'\\\\\n'
     rows = '\\\\\n'.join(
             [
                 data.index[i] + '&' + \
-                    '&'.join([format_tabular_cell(values[i,j], highlight[i,j]==1) for j in range(num_columns)])
+                    '&'.join([
+                        format_tabular_cell(
+                            values[i,j],
+                            highlight[i,j]==1,
+                            precision=precisions[data.columns[j]]
+                        )
+                        for j in range(num_columns)
+                    ])
                 for i in range(num_rows)
             ]
     )
 
     return table.format(**{
-        'format':'l|'+'d'*num_columns,
+        'format':format,
         'num_columns':num_columns+1,
         'title':title,
         'head':head,
         'rows':rows,
     })
 
-def format_tabular_cell(s, highlight=False, numeric=True):
+def format_tabular_cell(s, highlight=False, numeric=True, precision=None):
 
     if highlight and not numeric:
         s = '{\\bf ' + s + '}'
 
     if numeric:
-        s = '%.3f'%s
+        if precision is None:
+            s = '%.3f'%s
+        else:
+            s = ('%.'+str(precision)+'f')%s
     else:
         s = '\\multicolumn{1}{c}{'+s+'}'
 
     if highlight and numeric:
-        s = '\\multicolumn{1}{B{.}{.}{-1} }{'+s+'}'
+        s = '\\multicolumn{1}{B{.}{.}{'+str(precision)+'} }{'+s+'}'
 
     return s
 
