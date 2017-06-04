@@ -1,15 +1,16 @@
-import fnmatch
-import os
-import time
-import json
-import pandas
-import numpy as np
-import bokeh.plotting
+from IPython.core.display import HTML, display
 import bokeh.charts
 import bokeh.layouts
 import bokeh.models
 import bokeh.palettes
-from IPython.core.display import HTML, display
+import bokeh.plotting
+import copy
+import fnmatch
+import json
+import numpy as np
+import os
+import pandas
+import time
 
 verbose = False
 
@@ -318,29 +319,16 @@ def filter(records, configurations):
     filtered = records[match_mask]
     return filtered
 
-def smooth(keys, values, factor):
+def smooth(dataframe, columns, factor, downsample=True):
 
-    assert(len(keys) == len(values))
-    if len(keys) == 0:
-        return keys, values
+    result = dataframe.copy()
+    for column in columns:
+        result[column] = np.convolve(result[column], np.ones((factor,))/factor, mode='same')
 
-    # co-sort keys and values by keys
-    keys, values = map(np.array, zip(*sorted(zip(keys, values))))
+    if downsample:
+        result = result.iloc[factor/2:-factor/2:factor,:]
 
-    values_mean = np.mean(
-            np.array(
-                values[:int(np.floor(len(values)/factor))*factor]
-            ).reshape(-1,factor),
-            axis=1
-    )
-    keys_mean = np.mean(
-            np.array(
-                keys[:int(np.floor(len(keys)/factor))*factor]
-            ).reshape(-1,factor),
-            axis=1
-    )
-
-    return keys_mean, values_mean
+    return result
 
 def create_figure(title, figure_spec, curves, backend):
 
@@ -400,10 +388,10 @@ def create_bokeh_xy_figure(title, figure_spec, curves):
         records = records.fillna('nan')
 
         if 'smooth' in figure_spec and figure_spec['smooth'] > 0:
-            x, y = smooth(records[figure_spec['x_axis']], records[figure_spec['y_axis']], figure_spec['smooth'])
-            source = bokeh.models.ColumnDataSource({figure_spec['x_axis']: x, figure_spec['y_axis']: y})
-        else:
-            source = bokeh.models.ColumnDataSource(bokeh.models.ColumnDataSource.from_df(records))
+            k = figure_spec['smooth']
+            records = smooth(records, [figure_spec['y_axis']], k)
+
+        source = bokeh.models.ColumnDataSource(bokeh.models.ColumnDataSource.from_df(records))
 
         draw_function = figure.circle
         draw_args = {}
