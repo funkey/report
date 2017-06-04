@@ -126,7 +126,7 @@ def fetch_data_frame_from_json(row_generator, data_dir='processed'):
                 if record is None:
                     continue
             all_records.append(record)
-        except:
+        except Exception:
             print("record file " + f + " seems broken (maybe in process?)")
             pass
 
