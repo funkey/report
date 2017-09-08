@@ -918,8 +918,19 @@ def table(tables, configurations, results, groups=None, collapse_configurations=
                     else:
                         raise RuntimeError("method for collapsing has to be 'min' or 'max'")
 
-                rows.insert(0, 'label', pandas.Series([get_configuration_label(configuration)]*len(rows), index=rows.index))
-                table_data = table_data.append(rows, ignore_index=True)
+                # this is madness...
+                if backend == 'tex':
+
+                    rows.loc[:,'label'] = pandas.Series([get_configuration_label(configuration)]*len(rows), index=rows.index)
+                    rows = rows.set_index('label')
+                    rows.index.name = None # oh, of course, because otherwise we get an empyt row! m(
+
+                    table_data = table_data.append(rows)
+
+                else:
+
+                    rows.insert(0, 'label', pandas.Series([get_configuration_label(configuration)]*len(rows), index=rows.index))
+                    table_data = table_data.append(rows, ignore_index=True)
 
             if backend == 'tex':
 
